@@ -1,11 +1,13 @@
 package com.br.renatorgs.redelivery.delivery.tracking.domain.model;
 
 import com.br.renatorgs.redelivery.delivery.tracking.domain.enumerators.EnumDeliveryStatus;
+import com.br.renatorgs.redelivery.delivery.tracking.domain.exception.DomainException;
 import jakarta.persistence.Entity;
 import lombok.*;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -60,7 +62,36 @@ public class Delivery implements Serializable {
         calculateTotalItems();
     }
 
-    public void removeItem(){
+    public void editPreparationDetails(PreparationDetails details) throws DomainException {
+        verifyIfCanBeEdited();
+        setSender(details.getSender());
+        setRecipient(details.getRecipient());
+        setDistanceFee(details.getDistanceFee());
+        setCourierPayout(details.getCourierPayout());
+
+        setExpectedDeliveryAt(OffsetDateTime.now().plus(details.getExpectedDeliveryTime()));
+        setTotalCost(this.getDistanceFee().add(this.courierPayout));
+
+    }
+
+    public void place() throws DomainException {
+        verifyIfCanBePlaced();
+        this.changeStatusTo(EnumDeliveryStatus.WAITING_FOR_COURIER);
+        this.setPlacedAt(OffsetDateTime.now());
+    }
+
+    public void pickUp(UUID courierId) throws DomainException {
+        this.setCourierId(courierId);
+        this.changeStatusTo(EnumDeliveryStatus.IN_TRANSIT);
+        this.setAssignedAt(OffsetDateTime.now());
+    }
+
+    public void markAsDelivery() throws DomainException {
+        this.changeStatusTo(EnumDeliveryStatus.DELIVERY);
+        this.setFulFilledAt(OffsetDateTime.now());
+    }
+
+    public void removeItem() {
         items.clear();
         calculateTotalItems();
     }
@@ -69,8 +100,45 @@ public class Delivery implements Serializable {
         return Collections.unmodifiableList(this.items);
     }
 
-    private void calculateTotalItems(){
+    private void calculateTotalItems() {
         Integer totalItems = getItems().stream().mapToInt(Item::getQuantity).sum();
         setTotalItems(totalItems);
+    }
+
+    private void verifyIfCanBePlaced() throws DomainException {
+        if (!isFilled()) {
+            throw new DomainException();
+        }
+        if (!getStatus().equals(EnumDeliveryStatus.DRAFT)) {
+            throw new DomainException();
+        }
+    }
+
+    private void verifyIfCanBeEdited() throws DomainException {
+        if (!getStatus().equals(EnumDeliveryStatus.DRAFT)){
+            throw new DomainException();
+        }
+    }
+
+    private boolean isFilled() {
+        return this.getSender() != null && this.getRecipient() != null && this.totalCost != null;
+    }
+
+    private void changeStatusTo(EnumDeliveryStatus status) throws DomainException {
+        if(status != null && this.getStatus().canNotChangeTo(status)){
+            throw new DomainException();
+        }
+        this.setStatus(status);
+    }
+
+    @AllArgsConstructor
+    @Getter
+    @Builder
+    public static class PreparationDetails {
+        private ContactPoint sender;
+        private ContactPoint recipient;
+        private BigDecimal distanceFee;
+        private BigDecimal courierPayout;
+        private Duration expectedDeliveryTime;
     }
 }
