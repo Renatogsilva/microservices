@@ -1,16 +1,17 @@
 package com.br.renatorgs.redelivery.delivery.tracking.domain.model;
 
-import jakarta.persistence.Entity;
+import jakarta.persistence.Embeddable;
+
 import lombok.*;
 
 import java.io.Serializable;
 
+@Embeddable
 @AllArgsConstructor
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PACKAGE)
 @EqualsAndHashCode
 @Getter
 @Builder
-@Entity(name = "item")
 public class ContactPoint implements Serializable {
 
     private String zipCode;

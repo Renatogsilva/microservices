@@ -2,7 +2,7 @@ package com.br.renatorgs.redelivery.delivery.tracking.domain.model;
 
 import com.br.renatorgs.redelivery.delivery.tracking.domain.enumerators.EnumDeliveryStatus;
 import com.br.renatorgs.redelivery.delivery.tracking.domain.exception.DomainException;
-import jakarta.persistence.Entity;
+import jakarta.persistence.*;
 import lombok.*;
 
 import java.io.Serializable;
@@ -21,6 +21,7 @@ import java.util.UUID;
 @Entity(name = "delivery")
 public class Delivery implements Serializable {
 
+    @Id
     @EqualsAndHashCode.Include
     private UUID id;
     private UUID courierId;
@@ -33,8 +34,29 @@ public class Delivery implements Serializable {
     private BigDecimal totalCost;
     private Integer totalItems;
     private EnumDeliveryStatus status;
+
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "zipCode", column = @Column(name = "sender_zip_code")),
+            @AttributeOverride(name = "street", column = @Column(name = "sender_street")),
+            @AttributeOverride(name = "number", column = @Column(name = "sender_number")),
+            @AttributeOverride(name = "complement", column = @Column(name = "sender_complement")),
+            @AttributeOverride(name = "name", column = @Column(name = "sender_name")),
+            @AttributeOverride(name = "phone", column = @Column(name = "sender_phone"))
+    })
     private ContactPoint sender;
+
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "zipCode", column = @Column(name = "recipient_zip_code")),
+            @AttributeOverride(name = "street", column = @Column(name = "recipient_street")),
+            @AttributeOverride(name = "number", column = @Column(name = "recipient_number")),
+            @AttributeOverride(name = "complement", column = @Column(name = "recipient_complement")),
+            @AttributeOverride(name = "name", column = @Column(name = "recipient_name")),
+            @AttributeOverride(name = "phone", column = @Column(name = "recipient_phone"))
+    })
     private ContactPoint recipient;
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, mappedBy = "delivery")
     private List<Item> items = new ArrayList<>();
 
     public static Delivery draft() {
@@ -49,11 +71,10 @@ public class Delivery implements Serializable {
         return delivery;
     }
 
-    public UUID addItem(String name, Integer quantity) {
-        Item item = Item.brandNew(name, quantity);
+    public UUID addItem(String name, int quantity) {
+        Item item = Item.brandNew(name, quantity, this);
         items.add(item);
         calculateTotalItems();
-
         return item.getId();
     }
 
@@ -87,7 +108,7 @@ public class Delivery implements Serializable {
     }
 
     public void markAsDelivery() throws DomainException {
-        this.changeStatusTo(EnumDeliveryStatus.DELIVERY);
+        this.changeStatusTo(EnumDeliveryStatus.DELIVERED);
         this.setFulFilledAt(OffsetDateTime.now());
     }
 
@@ -115,7 +136,7 @@ public class Delivery implements Serializable {
     }
 
     private void verifyIfCanBeEdited() throws DomainException {
-        if (!getStatus().equals(EnumDeliveryStatus.DRAFT)){
+        if (!getStatus().equals(EnumDeliveryStatus.DRAFT)) {
             throw new DomainException();
         }
     }
@@ -125,7 +146,7 @@ public class Delivery implements Serializable {
     }
 
     private void changeStatusTo(EnumDeliveryStatus status) throws DomainException {
-        if(status != null && this.getStatus().canNotChangeTo(status)){
+        if (status != null && this.getStatus().canNotChangeTo(status)) {
             throw new DomainException();
         }
         this.setStatus(status);
