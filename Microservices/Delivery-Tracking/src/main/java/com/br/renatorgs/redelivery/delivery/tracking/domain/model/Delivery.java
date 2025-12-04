@@ -1,9 +1,13 @@
 package com.br.renatorgs.redelivery.delivery.tracking.domain.model;
 
 import com.br.renatorgs.redelivery.delivery.tracking.domain.enumerators.EnumDeliveryStatus;
+import com.br.renatorgs.redelivery.delivery.tracking.domain.event.DeliveryFulFilledEvent;
+import com.br.renatorgs.redelivery.delivery.tracking.domain.event.DeliveryPickUpEvent;
+import com.br.renatorgs.redelivery.delivery.tracking.domain.event.DeliveryPlacedEvent;
 import com.br.renatorgs.redelivery.delivery.tracking.domain.exception.DomainException;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.domain.AbstractAggregateRoot;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -15,11 +19,11 @@ import java.util.List;
 import java.util.UUID;
 
 @NoArgsConstructor(access = AccessLevel.PACKAGE)
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 @Setter(AccessLevel.PRIVATE)
 @Getter
 @Entity(name = "delivery")
-public class Delivery implements Serializable {
+public class Delivery extends AbstractAggregateRoot<Delivery> implements Serializable {
 
     @Id
     @EqualsAndHashCode.Include
@@ -99,17 +103,20 @@ public class Delivery implements Serializable {
         verifyIfCanBePlaced();
         this.changeStatusTo(EnumDeliveryStatus.WAITING_FOR_COURIER);
         this.setPlacedAt(OffsetDateTime.now());
+        super.registerEvent(new DeliveryPlacedEvent(this.getPlacedAt(), this.getId()));
     }
 
     public void pickUp(UUID courierId) throws DomainException {
         this.setCourierId(courierId);
         this.changeStatusTo(EnumDeliveryStatus.IN_TRANSIT);
         this.setAssignedAt(OffsetDateTime.now());
+        super.registerEvent(new DeliveryPickUpEvent(this.assignedAt, this.getId()));
     }
 
     public void markAsDelivery() throws DomainException {
         this.changeStatusTo(EnumDeliveryStatus.DELIVERED);
         this.setFulFilledAt(OffsetDateTime.now());
+        super.registerEvent(new DeliveryFulFilledEvent(this.getFulFilledAt(), this.getId()));
     }
 
     public void removeItem() {

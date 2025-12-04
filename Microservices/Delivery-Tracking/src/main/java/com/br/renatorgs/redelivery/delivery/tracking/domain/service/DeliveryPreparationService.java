@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.util.UUID;
 
@@ -22,6 +23,10 @@ public class DeliveryPreparationService {
 
     @Autowired
     private DeliveryRepository deliveryRepository;
+    @Autowired
+    private DeliveryTimeEstimationService deliveryTimeEstimationService;
+    @Autowired
+    private CourierPayoutCalculationService courierPayoutCalculationService;
 
     @Transactional
     public Delivery draft(DeliveryInput input) throws DomainException {
@@ -36,7 +41,7 @@ public class DeliveryPreparationService {
     public Delivery edit(UUID deliveryId, DeliveryInput input) throws DomainException {
         Delivery delivery = deliveryRepository.findById(deliveryId).orElseThrow();
 
-        if(delivery  == null){
+        if (delivery == null) {
             throw new DomainException("");
         }
 
@@ -68,15 +73,18 @@ public class DeliveryPreparationService {
                 .name(recipientInput.getName())
                 .build();
 
-        Duration expectedDeliveryTime = Duration.ofHours(3);
-        BigDecimal payout = new BigDecimal("10");
+        DeliveryEstimate deliveryEstimate = deliveryTimeEstimationService.estimate(sender, recipient);
+
+        BigDecimal calculatedPayout = courierPayoutCalculationService.calculatePayout(deliveryEstimate.getDistanceInKm());
+
+        BigDecimal distanceFee = calculateFee(deliveryEstimate.getDistanceInKm());
 
         var preparationDetails = Delivery.PreparationDetails.builder()
                 .recipient(recipient)
                 .sender(sender)
-                .expectedDeliveryTime(expectedDeliveryTime)
-                .courierPayout(payout)
-                .distanceFee(new BigDecimal("10"))
+                .expectedDeliveryTime(deliveryEstimate.getEstimatedTime())
+                .courierPayout(calculatedPayout)
+                .distanceFee(calculateFee(deliveryEstimate.getDistanceInKm()))
                 .build();
 
         delivery.editPreparationDetails(preparationDetails);
@@ -86,4 +94,7 @@ public class DeliveryPreparationService {
         }
     }
 
+    private BigDecimal calculateFee(Double distanceInKm) {
+        return new BigDecimal("3").multiply(new BigDecimal(distanceInKm)).setScale(2, RoundingMode.HALF_EVEN);
+    }
 }

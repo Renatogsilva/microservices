@@ -1,9 +1,11 @@
 package com.br.renatorgs.redelivery.delivery.tracking.api.controller;
 
+import com.br.renatorgs.redelivery.delivery.tracking.api.model.CourierIdInput;
 import com.br.renatorgs.redelivery.delivery.tracking.api.model.DeliveryInput;
 import com.br.renatorgs.redelivery.delivery.tracking.domain.exception.DomainException;
 import com.br.renatorgs.redelivery.delivery.tracking.domain.model.Delivery;
 import com.br.renatorgs.redelivery.delivery.tracking.domain.repository.DeliveryRepository;
+import com.br.renatorgs.redelivery.delivery.tracking.domain.service.DeliveryChekpointService;
 import com.br.renatorgs.redelivery.delivery.tracking.domain.service.DeliveryPreparationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,8 @@ public class DeliveryController {
 
     @Autowired
     private DeliveryPreparationService deliveryPreparationService;
+    @Autowired
+    private DeliveryChekpointService deliveryChekpointService;
     @Autowired
     private DeliveryRepository deliveryRepository;
 
@@ -48,5 +52,20 @@ public class DeliveryController {
     @GetMapping("/{deliveryId}")
     public Delivery findById(@PathVariable UUID deliveryId) {
         return deliveryRepository.findById(deliveryId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @PostMapping("/{deliveryId}/placement")
+    public void place(@PathVariable UUID deliveryId) throws DomainException {
+        deliveryChekpointService.place(deliveryId);
+    }
+
+    @PostMapping("/{deliveryId}/pickups")
+    public void pickup(@PathVariable UUID deliveryId, @Valid CourierIdInput input) throws DomainException {
+        deliveryChekpointService.pickup(deliveryId, input.getId());
+    }
+
+    @PostMapping("/{deliveryId}/completion")
+    public void complete(@PathVariable UUID deliveryId) throws DomainException {
+        deliveryChekpointService.complete(deliveryId);
     }
 }
